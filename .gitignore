@@ -1,0 +1,36 @@
+# Environment Variables (CRITICAL)
+.env
+*.env
+.venv/
+env/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backend (Python)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend (Flutter)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+frontend/web/index.html.json
+frontend/pubspec.lock
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
