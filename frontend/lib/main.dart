@@ -6,6 +6,8 @@ import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 
+import 'screens/main_screen.dart';
+
 void main() {
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -21,8 +23,8 @@ final _routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        path: '/main',
+        builder: (context, state) => const MainScreen(),
       ),
     ],
     redirect: (context, state) {
@@ -30,7 +32,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
       final loggingIn = state.matchedLocation == '/login';
 
       if (!loggedIn && !loggingIn) return '/login';
-      if (loggedIn && loggingIn) return '/dashboard';
+      if (loggedIn && loggingIn) return '/main';
       return null;
     },
   );

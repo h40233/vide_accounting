@@ -5,6 +5,8 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/add_transaction_sheet.dart';
+import '../widgets/add_account_sheet.dart';
 
 enum ViewMode { calendar, list }
 
@@ -19,6 +21,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   ViewMode _viewMode = ViewMode.list;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay = DateTime.now();
+
+  // Used to force refresh FutureBuilders
+  Key _refreshKey = UniqueKey();
+
+  void _refreshData() {
+    setState(() {
+      _refreshKey = UniqueKey();
+    });
+  }
+
+  void _showAddTransaction() async {
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const AddTransactionSheet(),
+    );
+    if (result == true) {
+      _refreshData();
+    }
+  }
+
+  void _showAddAccount() async {
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const AddAccountSheet(),
+    );
+    if (result == true) {
+      _refreshData();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,25 +75,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           // Mode Selector
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: SegmentedButton<ViewMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ViewMode.list,
-                  label: Text('List'),
-                  icon: Icon(Icons.list_alt_rounded),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<ViewMode>(
+                    segments: const [
+                      ButtonSegment(value: ViewMode.list, label: Text('List'), icon: Icon(Icons.list_alt_rounded)),
+                      ButtonSegment(value: ViewMode.calendar, label: Text('Calendar'), icon: Icon(Icons.calendar_month_rounded)),
+                    ],
+                    selected: {_viewMode},
+                    onSelectionChanged: (Set<ViewMode> newSelection) {
+                      setState(() { _viewMode = newSelection.first; });
+                    },
+                  ),
                 ),
-                ButtonSegment(
-                  value: ViewMode.calendar,
-                  label: Text('Calendar'),
-                  icon: Icon(Icons.calendar_month_rounded),
-                ),
+                const SizedBox(width: 12),
+                IconButton.filledTonal(
+                  onPressed: _refreshData,
+                  icon: const Icon(Icons.refresh_rounded),
+                )
               ],
-              selected: {_viewMode},
-              onSelectionChanged: (Set<ViewMode> newSelection) {
-                setState(() {
-                  _viewMode = newSelection.first;
-                });
-              },
             ),
           ),
           
@@ -70,7 +106,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: _showAddTransaction,
         backgroundColor: Colors.tealAccent,
         foregroundColor: Colors.black,
         child: const Icon(Icons.add_rounded),
@@ -86,9 +122,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           _buildBalanceCard(context),
           const SizedBox(height: 32),
-          _buildSectionHeader(context, 'Recent Transactions (Top 10)', () {}),
+          _buildSectionHeader(context, 'Your Accounts', 'Add', _showAddAccount),
           const SizedBox(height: 16),
           FutureBuilder(
+            key: _refreshKey,
+            future: api.getAccounts(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const LinearProgressIndicator(color: Colors.tealAccent);
+              final List accounts = snapshot.data!.data;
+              return SizedBox(
+                height: 120,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: accounts.length,
+                  itemBuilder: (context, i) => _buildAccountCard(accounts[i]),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 32),
+          _buildSectionHeader(context, 'Recent Transactions', '', () {}),
+          const SizedBox(height: 16),
+          FutureBuilder(
+            key: ValueKey('tx_${_refreshKey.hashCode}'),
             future: api.getTransactions(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -127,6 +183,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         const Divider(),
         Expanded(
           child: FutureBuilder(
+            key: _refreshKey,
             future: api.getTransactions(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -197,17 +254,47 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, VoidCallback onTap) {
+  Widget _buildSectionHeader(BuildContext context, String title, String actionText, VoidCallback onTap) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextButton(onPressed: onTap, child: const Text('See All', style: TextStyle(color: Colors.tealAccent))),
+        if (actionText.isNotEmpty)
+          TextButton(onPressed: onTap, child: Text(actionText, style: const TextStyle(color: Colors.tealAccent))),
       ],
     );
   }
 
+  Widget _buildAccountCard(Map account) {
+    return Container(
+      width: 180,
+      margin: const EdgeInsets.only(right: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1D23),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.03)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Icon(FontAwesomeIcons.wallet, size: 18, color: Colors.tealAccent),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(account['name'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text('\$${account['balance']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTransactionItem(Map tx) {
+
     final isIncome = tx['type'] == 'income';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
